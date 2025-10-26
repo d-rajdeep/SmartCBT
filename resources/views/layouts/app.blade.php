@@ -95,7 +95,7 @@
 
           <div class="menu-inner-shadow"></div>
 
-        @include('layouts.sidebar')  
+        @include('layouts.sidebar')
         <!-- / Menu -->
 
         <!-- Layout container -->
@@ -644,7 +644,7 @@
               </div>
             </div> --}}
             <!-- / Content -->
-        
+
             <!-- Footer -->
         @include('layouts.footer')
             <!-- / Footer -->
