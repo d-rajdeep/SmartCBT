@@ -2,23 +2,21 @@
 
 namespace App\Http\Middleware;
 
-use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Closure;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class UserMiddleware
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     */
-    public function handle($request, Closure $next)
+    public function handle(Request $request, Closure $next)
     {
-        if (Auth::check() && Auth::user()->role === 'user') {
-            return $next($request);
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+
+        if (!$user || $user->isAdmin()) {
+            abort(403, 'Unauthorized access.');
         }
-        return redirect()->route('login')->with('error', 'Unauthorized access!');
+
+        return $next($request);
     }
 }

@@ -3,135 +3,191 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
-use App\Models\Answer;
 use App\Models\Exam;
-use App\Models\Option;
-use App\Models\UserExam;
+use App\Models\ExamAttempt;
+use App\Models\Result;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ExamController extends Controller
 {
-
-    public function index()
+    public function instructions(Exam $exam)
     {
-        $exams = Exam::latest()->get();
-        return view('admin.exams.index', compact('exams'));
-    }
-
-    public function create()
-    {
-        return view('admin.exams.create');
-    }
-
-    public function store(Request $request)
-    {
-        $request->validate(['title' => 'required', 'duration' => 'required|integer']);
-        Exam::create($request->only('title', 'description', 'duration') + ['published' => false]);
-        return redirect()->route('admin.exams.index')->with('success', 'Exam created.');
-    }
-
-    public function edit(Exam $exam)
-    {
-        return view('admin.exams.edit', compact('exam'));
-    }
-
-    public function update(Request $request, Exam $exam)
-    {
-        $exam->update($request->all());
-        return redirect()->route('admin.exams.index')->with('success', 'Updated.');
-    }
-
-    public function destroy(Exam $exam)
-    {
-        $exam->delete();
-        return back()->with('success', 'Deleted.');
-    }
-
-    public function start(Request $request, Exam $exam)
-    {
-        $user = $request->user();
-
-        // prevent re-attempt unless you want multiple attempts
-        $exists = UserExam::where('user_id', $user->id)->where('exam_id', $exam->id)->first();
-        if ($exists && $exists->submitted) {
-            return redirect()->route('user.exams.index')->with('error', 'You already submitted this exam.');
-        }
-        if (!$exists) {
-            // build a question order (shuffle)
-            $qIds = $exam->questions()->pluck('id')->toArray();
-            shuffle($qIds);
-            $userExam = UserExam::create([
-                'user_id' => $user->id,
-                'exam_id' => $exam->id,
-                'started_at' => now(),
-                'question_order' => $qIds
-            ]);
-        } else {
-            $userExam = $exists;
-            if (!$userExam->started_at) {
-                $userExam->update(['started_at' => now()]);
-            }
+        // Check if user can attempt
+        if (!$exam->canUserAttempt(auth()->id())) {
+            return redirect()->route('user.dashboard')
+                ->with('error', 'You cannot attempt this exam.');
         }
 
-        return redirect()->route('user.exams.take', $userExam->id);
+        return view('user.exams.instructions', compact('exam'));
     }
 
-    public function saveAnswer(Request $request, $userExamId)
+    public function start(Exam $exam)
     {
-        $data = $request->validate([
-            'question_id' => 'required|exists:questions,id',
-            'option_id' => 'nullable|exists:options,id',
-            'marked_for_review' => 'nullable|boolean',
+        // Check if there's an in-progress attempt
+        $existingAttempt = ExamAttempt::where('user_id', auth()->id())
+            ->where('exam_id', $exam->id)
+            ->where('status', 'in-progress')
+            ->first();
+
+        if ($existingAttempt) {
+            return redirect()->route('user.exam.take', $existingAttempt);
+        }
+
+        // Create new attempt
+        $attempt = ExamAttempt::create([
+            'user_id' => auth()->id(),
+            'exam_id' => $exam->id,
+            'started_at' => now(),
+            'status' => 'in-progress',
+            'answers' => json_encode([]),
+            'marked_questions' => json_encode([]),
+            'tab_switch_count' => 0,
         ]);
 
-        $userExam = UserExam::findOrFail($userExamId);
-        // ensure it belongs to current user and not submitted
-        if ($userExam->user_id !== $request->user()->id || $userExam->submitted) {
+        return redirect()->route('user.exam.take', $attempt);
+    }
+
+    public function take(ExamAttempt $attempt)
+    {
+        // Security checks
+        if ($attempt->user_id !== auth()->id()) {
             abort(403);
         }
 
-        $answer = Answer::updateOrCreate(
-            ['user_exam_id' => $userExam->id, 'question_id' => $data['question_id']],
-            [
-                'option_id' => $data['option_id'] ?? null,
-                'marked_for_review' => $data['marked_for_review'] ?? false,
-                'is_correct' => optional(Option::find($data['option_id']))->is_correct ? true : false
-            ]
-        );
+        if ($attempt->status !== 'in-progress') {
+            return redirect()->route('user.dashboard')
+                ->with('error', 'This exam has already been submitted.');
+        }
 
-        return response()->json(['status' => 'ok']);
+        $exam = $attempt->exam;
+
+        // Get questions with randomization if enabled
+        $questions = $exam->questions;
+        if ($exam->randomize_questions) {
+            $questions = $questions->shuffle();
+        }
+
+        // Load options for each question
+        foreach ($questions as $question) {
+            $question->options = $question->options->shuffle();
+        }
+
+        $savedAnswers = json_decode($attempt->answers, true) ?? [];
+        $markedQuestions = json_decode($attempt->marked_questions, true) ?? [];
+
+        return view('user.exams.take', compact('exam', 'questions', 'attempt', 'savedAnswers', 'markedQuestions'));
     }
 
-    public function submit(Request $request, $userExamId)
+    public function autoSave(Request $request, ExamAttempt $attempt)
     {
-        $userExam = UserExam::with('exam')->findOrFail($userExamId);
-        if ($userExam->user_id !== auth()->id()) {
-            abort(403, 'Unauthorized action.');
+        if ($attempt->user_id !== auth()->id() || $attempt->status !== 'in-progress') {
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-
-        if ($userExam->submitted) {
-            return redirect()->route('user.exams.result', $userExam->id);
-        }
-
-        // compute score
-        $score = 0;
-        foreach ($userExam->exam->questions as $q) {
-            $ans = Answer::where('user_exam_id', $userExam->id)->where('question_id', $q->id)->first();
-            if ($ans && $ans->option && $ans->option->is_correct) {
-                $score += $q->marks;
-                $ans->update(['is_correct' => true]);
-            } else {
-                $ans?->update(['is_correct' => false]);
-            }
-        }
-
-        $userExam->update([
-            'score' => $score,
-            'submitted' => true,
-            'submitted_at' => now()
+        $attempt->update([
+            'answers' => json_encode($request->answers),
+            'marked_questions' => json_encode($request->marked),
         ]);
 
-        return redirect()->route('user.exams.result', $userExam->id);
+        return response()->json(['success' => true]);
+    }
+
+    public function submit(Request $request, ExamAttempt $attempt)
+    {
+        if ($attempt->user_id !== auth()->id() || $attempt->status !== 'in-progress') {
+            abort(403);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $exam = $attempt->exam;
+            $answers = json_decode($request->answers_input, true) ?? [];
+
+            // Calculate results
+            $questions = $exam->questions()->with('options')->get();
+            $correctAnswers = 0;
+            $wrongAnswers = 0;
+            $totalMarks = 0;
+            $obtainedMarks = 0;
+            $sectionPerformance = [];
+
+            foreach ($questions as $question) {
+                $totalMarks += $question->marks;
+                $userAnswer = $answers[$question->id] ?? null;
+
+                if (!$userAnswer) {
+                    continue;
+                }
+
+                $correctOption = $question->options->where('is_correct', true)->first();
+
+                if ($correctOption && $correctOption->id == $userAnswer) {
+                    $correctAnswers++;
+                    $obtainedMarks += $question->marks;
+                } else {
+                    $wrongAnswers++;
+                    $obtainedMarks -= $question->negative_marks;
+                }
+            }
+
+            $skippedAnswers = $questions->count() - ($correctAnswers + $wrongAnswers);
+            $percentage = max(0, ($obtainedMarks / $totalMarks) * 100);
+            $isPassed = $percentage >= $exam->passing_percentage;
+
+            // Create result
+            $result = Result::create([
+                'exam_attempt_id' => $attempt->id,
+                'user_id' => auth()->id(),
+                'exam_id' => $exam->id,
+                'total_questions' => $questions->count(),
+                'correct_answers' => $correctAnswers,
+                'wrong_answers' => $wrongAnswers,
+                'skipped_answers' => $skippedAnswers,
+                'total_marks_obtained' => $obtainedMarks,
+                'total_marks' => $totalMarks,
+                'percentage' => $percentage,
+                'is_passed' => $isPassed,
+                'section_wise_performance' => json_encode($sectionPerformance),
+            ]);
+
+            // Update attempt
+            $attempt->update([
+                'completed_at' => now(),
+                'status' => 'completed',
+                'score' => $obtainedMarks,
+                'percentage' => $percentage,
+            ]);
+
+            DB::commit();
+
+            if ($exam->show_result_immediately) {
+                return redirect()->route('user.results.show', $result)
+                    ->with('success', 'Exam submitted successfully!');
+            }
+
+            return redirect()->route('user.dashboard')
+                ->with('success', 'Exam submitted successfully! Results will be announced soon.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Something went wrong: ' . $e->getMessage());
+        }
+    }
+
+    public function available()
+    {
+        $exams = Exam::where('is_published', true)
+            ->where(function ($query) {
+                $query->whereNull('start_date')
+                    ->orWhere('start_date', '<=', now());
+            })
+            ->where(function ($query) {
+                $query->whereNull('end_date')
+                    ->orWhere('end_date', '>=', now());
+            })
+            ->get();
+
+        return view('user.exams.available', compact('exams'));
     }
 }

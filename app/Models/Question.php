@@ -3,10 +3,22 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Question extends Model
 {
-    protected $fillable = ['exam_id', 'question_text', 'marks', 'explanation'];
+    use HasFactory;
+
+    protected $fillable = [
+        'exam_id',
+        'question_text',
+        'difficulty',
+        'marks',
+        'negative_marks',
+        'explanation',
+        'type',
+        'order'
+    ];
 
     public function exam()
     {
@@ -16,5 +28,10 @@ class Question extends Model
     public function options()
     {
         return $this->hasMany(Option::class);
+    }
+
+    public function getCorrectOption()
+    {
+        return $this->options()->where('is_correct', true)->first();
     }
 }
