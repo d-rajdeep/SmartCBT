@@ -28,7 +28,7 @@
                     <tbody>
                         @forelse($categories as $category)
                             <tr>
-                                <td>{{ $category->id }}</td>
+                                <td>{{ $loop->index + 1 }}</td>
                                 <td>{{ $category->name }}</td>
                                 <td>{{ $category->slug }}</td>
                                 <td>{{ Str::limit($category->description, 50) }}</td>

@@ -15,6 +15,20 @@
         </div>
     </div>
 
+    @if (session('success'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            {{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+
+    @if (session('error'))
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            {{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+
     <div class="card">
         <div class="card-body">
             @if ($questions->count() > 0)
@@ -26,13 +40,14 @@
                                 <th>Question</th>
                                 <th>Difficulty</th>
                                 <th>Marks</th>
+                                <th>Options</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach ($questions as $index => $question)
                                 <tr>
-                                    <td>{{ $index + 1 }}</td>
+                                    <td>{{ ($questions->currentPage() - 1) * $questions->perPage() + $index + 1 }}</td>
                                     <td>{{ Str::limit($question->question_text, 100) }}</td>
                                     <td>
                                         <span
@@ -41,6 +56,7 @@
                                         </span>
                                     </td>
                                     <td>{{ $question->marks }}</td>
+                                    <td>{{ $question->options->count() }} options</td>
                                     <td>
                                         <a href="{{ route('admin.questions.edit', [$exam, $question]) }}"
                                             class="btn btn-sm btn-warning">

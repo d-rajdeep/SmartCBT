@@ -56,9 +56,10 @@ Route::middleware('admin')->prefix('admin')->name('admin.')->group(function () {
 
     // Question management
     Route::prefix('exams/{exam}')->group(function () {
-        Route::resource('questions', App\Http\Controllers\Admin\QuestionController::class);
+        Route::resource('questions', App\Http\Controllers\Admin\QuestionController::class)->except(['show']);
         Route::get('/questions/bulk-upload', [App\Http\Controllers\Admin\QuestionController::class, 'bulkUpload'])->name('questions.bulk-upload');
         Route::post('/questions/bulk-upload', [App\Http\Controllers\Admin\QuestionController::class, 'processBulkUpload'])->name('questions.process-bulk-upload');
+        Route::get('/questions/download-template', [App\Http\Controllers\Admin\QuestionController::class, 'downloadTemplate'])->name('questions.download-template');
     });
 
     // User management

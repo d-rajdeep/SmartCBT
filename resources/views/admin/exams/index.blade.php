@@ -28,7 +28,7 @@
                     <tbody>
                         @forelse($exams as $exam)
                             <tr>
-                                <td>{{ $exam->id }}</td>
+                                <td>{{ $loop->index + 1 }}</td>
                                 <td>{{ $exam->title }}</td>
                                 <td>{{ $exam->category->name ?? 'N/A' }}</td>
                                 <td>{{ $exam->total_questions }}</td>

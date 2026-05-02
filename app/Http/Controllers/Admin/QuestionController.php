@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Exam;
 use App\Models\Question;
 use App\Models\Option;
+use App\Imports\QuestionsImport;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
 
 class QuestionController extends Controller
@@ -33,36 +36,52 @@ class QuestionController extends Controller
             'options' => 'required|array|min:2',
             'options.*' => 'required|string',
             'correct_option' => 'required|integer|min:0',
-            'type' => 'required|in:single,multiple',
         ]);
 
-        $question = $exam->questions()->create([
-            'question_text' => $validated['question_text'],
-            'difficulty' => $validated['difficulty'],
-            'marks' => $validated['marks'],
-            'negative_marks' => $validated['negative_marks'],
-            'explanation' => $validated['explanation'],
-            'type' => $validated['type'],
-            'order' => $exam->questions()->count() + 1,
-        ]);
+        DB::beginTransaction();
 
-        // Create options
-        foreach ($validated['options'] as $index => $optionText) {
-            Option::create([
-                'question_id' => $question->id,
-                'option_text' => $optionText,
-                'is_correct' => $index == $validated['correct_option'],
-                'order' => $index + 1,
+        try {
+            $question = Question::create([
+                'exam_id' => $exam->id,
+                'question_text' => $validated['question_text'],
+                'difficulty' => $validated['difficulty'],
+                'marks' => $validated['marks'],
+                'negative_marks' => $validated['negative_marks'],
+                'explanation' => $validated['explanation'] ?? null,
+                'type' => 'single',
+                'order' => $exam->questions()->count() + 1,
             ]);
+
+            foreach ($validated['options'] as $index => $optionText) {
+                Option::create([
+                    'question_id' => $question->id,
+                    'option_text' => $optionText,
+                    'is_correct' => $index == $validated['correct_option'],
+                    'order' => $index + 1,
+                ]);
+            }
+
+            $exam->update([
+                'total_questions' => $exam->questions()->count()
+            ]);
+
+            DB::commit();
+
+            return redirect()->route('admin.questions.index', $exam)
+                ->with('success', 'Question added successfully!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Question store error: ' . $e->getMessage());
+
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Failed to add question: ' . $e->getMessage());
         }
+    }
 
-        // Update total questions count in exam
-        $exam->update([
-            'total_questions' => $exam->questions()->count()
-        ]);
-
-        return redirect()->route('admin.exams.questions.index', $exam)
-            ->with('success', 'Question added successfully!');
+    public function show(Exam $exam, Question $question)
+    {
+        return redirect()->route('admin.questions.edit', [$exam, $question]);
     }
 
     public function edit(Exam $exam, Question $question)
@@ -83,37 +102,55 @@ class QuestionController extends Controller
             'correct_option' => 'required|integer|min:0',
         ]);
 
-        $question->update([
-            'question_text' => $validated['question_text'],
-            'difficulty' => $validated['difficulty'],
-            'marks' => $validated['marks'],
-            'negative_marks' => $validated['negative_marks'],
-            'explanation' => $validated['explanation'],
-        ]);
+        DB::beginTransaction();
 
-        // Update options
-        foreach ($question->options as $index => $option) {
-            $option->update([
-                'option_text' => $validated['options'][$index],
-                'is_correct' => $index == $validated['correct_option'],
+        try {
+            $question->update([
+                'question_text' => $validated['question_text'],
+                'difficulty' => $validated['difficulty'],
+                'marks' => $validated['marks'],
+                'negative_marks' => $validated['negative_marks'],
+                'explanation' => $validated['explanation'] ?? null,
             ]);
-        }
 
-        return redirect()->route('admin.exams.questions.index', $exam)
-            ->with('success', 'Question updated successfully!');
+            foreach ($question->options as $index => $option) {
+                $option->update([
+                    'option_text' => $validated['options'][$index],
+                    'is_correct' => $index == $validated['correct_option'],
+                ]);
+            }
+
+            DB::commit();
+
+            return redirect()->route('admin.questions.index', $exam)
+                ->with('success', 'Question updated successfully!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Question update error: ' . $e->getMessage());
+
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Failed to update question: ' . $e->getMessage());
+        }
     }
 
     public function destroy(Exam $exam, Question $question)
     {
-        $question->delete();
+        try {
+            $question->delete();
 
-        // Update total questions count
-        $exam->update([
-            'total_questions' => $exam->questions()->count()
-        ]);
+            $exam->update([
+                'total_questions' => $exam->questions()->count()
+            ]);
 
-        return redirect()->route('admin.exams.questions.index', $exam)
-            ->with('success', 'Question deleted successfully!');
+            return redirect()->route('admin.questions.index', $exam)
+                ->with('success', 'Question deleted successfully!');
+        } catch (\Exception $e) {
+            Log::error('Question delete error: ' . $e->getMessage());
+
+            return redirect()->back()
+                ->with('error', 'Failed to delete question: ' . $e->getMessage());
+        }
     }
 
     public function bulkUpload(Exam $exam)
@@ -124,40 +161,77 @@ class QuestionController extends Controller
     public function processBulkUpload(Request $request, Exam $exam)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,csv|max:5120',
+            'file' => 'required|file|mimes:csv,txt,xlsx,xls|max:5120',
         ]);
 
-        // Process Excel file
-        $data = Excel::toArray([], $request->file('file'));
+        try {
+            $import = new QuestionsImport($exam);
+            Excel::import($import, $request->file('file'));
 
-        foreach ($data[0] as $row) {
-            // Create question
-            $question = $exam->questions()->create([
-                'question_text' => $row[0],
-                'difficulty' => $row[5] ?? 'medium',
-                'marks' => $row[6] ?? 1,
-                'negative_marks' => $row[7] ?? 0,
-                'type' => 'single',
-                'order' => $exam->questions()->count() + 1,
-            ]);
+            $errors = $import->getErrors();
+            $successCount = $import->getSuccessCount();
 
-            // Create options (assuming 4 options)
-            for ($i = 1; $i <= 4; $i++) {
-                Option::create([
-                    'question_id' => $question->id,
-                    'option_text' => $row[$i],
-                    'is_correct' => $i == $row[4], // correct option index
-                    'order' => $i,
-                ]);
+            $message = "Successfully imported {$successCount} questions.";
+
+            if (!empty($errors) && $successCount > 0) {
+                $message .= " However, some rows had errors: " . implode('; ', array_slice($errors, 0, 5));
+                if (count($errors) > 5) {
+                    $message .= " and " . (count($errors) - 5) . " more errors.";
+                }
+                return redirect()->route('admin.questions.index', $exam)
+                    ->with('warning', $message);
+            } elseif (!empty($errors)) {
+                return redirect()->back()
+                    ->with('error', 'Import failed: ' . implode('; ', array_slice($errors, 0, 5)));
             }
+
+            return redirect()->route('admin.questions.index', $exam)
+                ->with('success', $message);
+        } catch (\Exception $e) {
+            Log::error('Bulk upload error: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Failed to process bulk upload: ' . $e->getMessage() . ' Please check your CSV format.');
         }
+    }
 
-        // Update total questions
-        $exam->update([
-            'total_questions' => $exam->questions()->count()
+    public function downloadTemplate(Exam $exam)
+    {
+        $headers = [
+            'question',
+            'option_a',
+            'option_b',
+            'option_c',
+            'option_d',
+            'correct_option',
+            'difficulty',
+            'marks',
+            'negative_marks',
+            'explanation'
+        ];
+
+        $example = [
+            'What is Laravel?',
+            'A JavaScript framework',
+            'A PHP framework',
+            'A Python framework',
+            'A Ruby framework',
+            '2',
+            'easy',
+            '1',
+            '0',
+            'Laravel is a free, open-source PHP web framework.'
+        ];
+
+        $callback = function () use ($headers, $example) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $headers);
+            fputcsv($file, $example);
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="questions_template.csv"'
         ]);
-
-        return redirect()->route('admin.exams.questions.index', $exam)
-            ->with('success', 'Questions uploaded successfully!');
     }
 }

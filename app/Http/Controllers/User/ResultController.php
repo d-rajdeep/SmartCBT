@@ -29,24 +29,33 @@ class ResultController extends Controller
     {
         // Security check
         if ($result->user_id !== auth()->id()) {
-            abort(403);
+            abort(403, 'Unauthorized access.');
         }
 
         $result->load(['exam', 'examAttempt']);
 
         // Get detailed answers with analysis
-        $answers = json_decode($result->examAttempt->answers, true) ?? [];
+        $answers = json_decode($result->examAttempt->answers ?? '{}', true) ?? [];
         $questions = $result->exam->questions()->with('options')->get();
 
         $detailedAnswers = [];
-        $correctCount = 0;
+        $sectionPerformance = [
+            'easy' => ['correct' => 0, 'total' => 0],
+            'medium' => ['correct' => 0, 'total' => 0],
+            'hard' => ['correct' => 0, 'total' => 0],
+        ];
 
         foreach ($questions as $question) {
             $userAnswer = $answers[$question->id] ?? null;
             $correctAnswer = $question->options->where('is_correct', true)->first();
             $isCorrect = $userAnswer && $correctAnswer && $userAnswer == $correctAnswer->id;
 
-            if ($isCorrect) $correctCount++;
+            // Update section performance
+            $difficulty = $question->difficulty;
+            $sectionPerformance[$difficulty]['total']++;
+            if ($isCorrect) {
+                $sectionPerformance[$difficulty]['correct']++;
+            }
 
             $detailedAnswers[] = [
                 'question' => $question,
@@ -56,28 +65,7 @@ class ResultController extends Controller
             ];
         }
 
-        // Calculate time per question (mock data)
-        $timePerQuestion = [];
-        for ($i = 0; $i < $questions->count(); $i++) {
-            $timePerQuestion[] = rand(30, 180); // Simulated seconds per question
-        }
-
-        // Section-wise performance
-        $sectionPerformance = [
-            'easy' => ['correct' => 0, 'total' => 0],
-            'medium' => ['correct' => 0, 'total' => 0],
-            'hard' => ['correct' => 0, 'total' => 0],
-        ];
-
-        foreach ($detailedAnswers as $item) {
-            $difficulty = $item['question']->difficulty;
-            $sectionPerformance[$difficulty]['total']++;
-            if ($item['is_correct']) {
-                $sectionPerformance[$difficulty]['correct']++;
-            }
-        }
-
-        return view('user.results.show', compact('result', 'detailedAnswers', 'sectionPerformance', 'timePerQuestion'));
+        return view('user.results.show', compact('result', 'detailedAnswers', 'sectionPerformance'));
     }
 
     public function downloadCertificate(Result $result)
@@ -86,9 +74,7 @@ class ResultController extends Controller
             abort(403);
         }
 
-        // Generate PDF certificate
-        // This would require barryvdh/laravel-dompdf package
-        // For now, redirect back with message
+        // Certificate download feature
         return back()->with('info', 'Certificate download feature coming soon!');
     }
 }

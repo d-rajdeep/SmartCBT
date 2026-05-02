@@ -29,7 +29,7 @@
                     <tbody>
                         @forelse($users as $user)
                             <tr>
-                                <td>{{ $user->id }}</td>
+                                <td>{{ $loop->index + 1 }}</td>
                                 <td>{{ $user->name }}</td>
                                 <td>{{ $user->email }}</td>
                                 <td>{{ $user->phone ?? 'N/A' }}</td>

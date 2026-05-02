@@ -61,7 +61,7 @@
                     <tbody>
                         @forelse($results as $result)
                             <tr>
-                                <td>{{ $result->id }}</td>
+                                <td>{{ $loop->index + 1 }}</td>
                                 <td>{{ $result->user->name }}</td>
                                 <td>{{ $result->exam->title }}</td>
                                 <td>{{ $result->total_marks_obtained }}/{{ $result->total_marks }}</td>
