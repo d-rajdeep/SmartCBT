@@ -18,7 +18,7 @@
     <div class="row mb-5 g-4">
         <!-- Total Users -->
         <div class="col-xl-3 col-sm-6">
-            <div class="stats-card-premium primary p-4 h-100">
+            <div class="stats-card-premium bg-primary p-4 h-100">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <h6 class="text-white text-opacity-75 mb-2 fw-medium">Total Users</h6>
@@ -38,7 +38,7 @@
         
         <!-- Total Exams -->
         <div class="col-xl-3 col-sm-6">
-            <div class="stats-card-premium success p-4 h-100">
+            <div class="stats-card-premium bg-success p-4 h-100">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <h6 class="text-white text-opacity-75 mb-2 fw-medium">Total Exams</h6>
@@ -58,7 +58,7 @@
         
         <!-- Total Attempts -->
         <div class="col-xl-3 col-sm-6">
-            <div class="stats-card-premium info p-4 h-100">
+            <div class="stats-card-premium bg-info p-4 h-100">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <h6 class="text-white text-opacity-75 mb-2 fw-medium">Total Attempts</h6>
@@ -78,7 +78,7 @@
         
         <!-- Average Score -->
         <div class="col-xl-3 col-sm-6">
-            <div class="stats-card-premium warning p-4 h-100">
+            <div class="stats-card-premium bg-warning p-4 h-100">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <h6 class="text-white text-opacity-75 mb-2 fw-medium">Average Score</h6>
