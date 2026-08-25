@@ -155,7 +155,7 @@ h1, h2, h3, h4, h5, h6 {
 .form-control:focus, .form-select:focus {
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
     border-color: var(--primary-color);
-    background-color: #ffffff;
+    background-color: #fff;
 }
 
 /* Badges */
@@ -228,7 +228,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .premium-sidebar .nav-link:hover {
     background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
+    color: #6366f1ff;
     padding-left: 1.8rem;
 }
 

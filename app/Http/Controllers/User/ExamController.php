@@ -75,8 +75,22 @@ class ExamController extends Controller
 
         $savedAnswers = json_decode($attempt->answers, true) ?? [];
         $markedQuestions = json_decode($attempt->marked_questions, true) ?? [];
+        $attemptNumber = ExamAttempt::where('user_id', $attempt->user_id)
+            ->where('exam_id', $attempt->exam_id)
+            ->where('created_at', '<=', $attempt->created_at)
+            ->count();
+        $elapsedSeconds = max(0, now()->timestamp - $attempt->started_at->timestamp);
+        $timeLeft = max(0, ($exam->duration * 60) - $elapsedSeconds);
 
-        return view('user.exams.take', compact('exam', 'questions', 'attempt', 'savedAnswers', 'markedQuestions'));
+        return view('user.exams.take', compact(
+            'exam',
+            'questions',
+            'attempt',
+            'savedAnswers',
+            'markedQuestions',
+            'attemptNumber',
+            'timeLeft'
+        ));
     }
 
     public function autoSave(Request $request, ExamAttempt $attempt)

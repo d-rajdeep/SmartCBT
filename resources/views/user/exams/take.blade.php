@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Taking Exam: {{ $exam->title }} | SmartCBT</title>
+    <link rel="icon" type="image/svg+xml" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/svgs/solid/graduation-cap.svg">
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -25,6 +26,22 @@
             padding: 0;
             box-sizing: border-box;
             font-family: 'Outfit', sans-serif;
+        }
+
+        :root {
+            --color-background: var(--bg-body);
+            --color-surface: #ffffff;
+            --color-text: var(--text-primary);
+            --color-text-muted: var(--text-secondary);
+            --color-border: var(--border-color);
+            --color-primary: var(--primary-color);
+            --color-primary-dark: #4f46e5;
+            --color-primary-light: #eef2ff;
+            --color-primary-rgb: 99, 102, 241;
+            --color-success: var(--success-color);
+            --color-warning: var(--warning-color);
+            --radius-md: var(--border-radius-md);
+            --radius-lg: var(--border-radius-lg);
         }
 
         body {
@@ -55,6 +72,17 @@
             font-size: 1.25rem;
             font-weight: 700;
             color: var(--color-text);
+        }
+
+        .attempt-badge {
+            background: #eef2ff;
+            color: #4338ca;
+            border: 1px solid #c7d2fe;
+            border-radius: 50px;
+            padding: 7px 14px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            white-space: nowrap;
         }
 
         .timer {
@@ -420,6 +448,11 @@
             transform: translateY(-2px);
         }
 
+        .confirm-btn:disabled {
+            opacity: 0.7;
+            cursor: wait;
+        }
+
         .cancel-btn {
             background: white;
             color: var(--color-text);
@@ -454,6 +487,9 @@
                 <i class="fas fa-laptop-code"></i>
             </div>
             {{ $exam->title }}
+            <span class="attempt-badge ms-3">
+                Attempt {{ $attemptNumber }} of {{ $exam->max_attempts }}
+            </span>
         </div>
         <div class="timer" id="timer">00:00:00</div>
         <div class="question-palette-btn" onclick="togglePalette()">
@@ -572,8 +608,8 @@
             </div>
             
             <div class="modal-buttons">
-                <button class="modal-btn cancel-btn" onclick="closeModal()">Return to Exam</button>
-                <button class="modal-btn confirm-btn" onclick="submitExam()">Confirm Submission</button>
+                <button type="button" class="modal-btn cancel-btn" onclick="closeModal()">Return to Exam</button>
+                <button type="button" class="modal-btn confirm-btn" onclick="submitExam()">Confirm Submission</button>
             </div>
         </div>
     </div>
@@ -583,8 +619,9 @@
         const totalQuestions = {{ count($questions) }};
         let answered = new Array(totalQuestions).fill(false);
         let markedForReview = new Array(totalQuestions).fill(false);
-        let timeLeft = {{ $exam->duration * 60 }}; // in seconds
+        const examEndsAt = Date.now() + ({{ $timeLeft }} * 1000);
         let examSubmitted = false;
+        let timerInterval = null;
 
         // Initialize from saved data
         @foreach ($savedAnswers as $qId => $answer)
@@ -599,6 +636,7 @@
         function updateTimer() {
             if (examSubmitted) return;
 
+            const timeLeft = Math.max(0, Math.ceil((examEndsAt - Date.now()) / 1000));
             const hours = Math.floor(timeLeft / 3600);
             const minutes = Math.floor((timeLeft % 3600) / 60);
             const seconds = timeLeft % 60;
@@ -613,14 +651,21 @@
             }
 
             if (timeLeft <= 0) {
-                submitExam();
-            } else {
-                timeLeft--;
-                setTimeout(updateTimer, 1000);
+                submitExam(true);
             }
         }
 
         updateTimer();
+        if (!examSubmitted) {
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        // Browsers may restore this page from their back/forward cache.
+        // Recalculate from the deadline immediately whenever it becomes active.
+        window.addEventListener('pageshow', updateTimer);
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) updateTimer();
+        });
 
         // Navigation
         function goToQuestion(index) {
@@ -777,9 +822,19 @@
             });
         }
 
-        function submitExam() {
+        function submitExam(timeExpired = false) {
             if (examSubmitted) return;
             examSubmitted = true;
+            if (timerInterval) clearInterval(timerInterval);
+
+            if (timeExpired) {
+                const modal = document.getElementById('submitModal');
+                modal.style.display = 'flex';
+                modal.querySelector('.modal-title').textContent = 'Time is up!';
+                modal.querySelector('.modal-desc').textContent = 'Your saved answers are being submitted automatically.';
+                modal.querySelector('.modal-stats').style.display = 'none';
+                modal.querySelector('.cancel-btn').style.display = 'none';
+            }
             
             // Show loading state
             const confirmBtn = document.querySelector('.confirm-btn');
@@ -807,6 +862,23 @@
 
         // Auto-save every 30 seconds
         setInterval(autoSave, 30000);
+
+        // Protect an active attempt from accidental refresh or navigation.
+        window.addEventListener('beforeunload', function (event) {
+            if (!examSubmitted) {
+                event.preventDefault();
+                event.returnValue = '';
+            }
+        });
+
+        document.addEventListener('keydown', function (event) {
+            const refreshShortcut = event.key === 'F5'
+                || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'r');
+
+            if (refreshShortcut && !examSubmitted) {
+                event.preventDefault();
+            }
+        });
         
         // Setup transition effects
         document.querySelectorAll('.question-card').forEach(card => {

@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login | SmartCBT</title>
+    <link rel="icon" type="image/svg+xml" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/svgs/solid/graduation-cap.svg">
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -61,6 +62,20 @@
         .login-logo i {
             font-size: 2.5rem;
             margin-bottom: 0.5rem;
+        }
+
+        .login-card .input-group-text,
+        .login-card .form-control,
+        .login-card .form-control:focus {
+            background-color: #ffffff !important;
+        }
+
+        .login-card .form-control:-webkit-autofill,
+        .login-card .form-control:-webkit-autofill:hover,
+        .login-card .form-control:-webkit-autofill:focus {
+            -webkit-text-fill-color: var(--text-primary);
+            -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+            transition: background-color 9999s ease-out 0s;
         }
 
         @keyframes slideUp {
@@ -129,24 +144,20 @@
                     <label class="form-check-label small text-muted user-select-none" for="remember">Keep me signed in</label>
                 </div>
 
-                <button type="submit" class="btn btn-primary w-100 rounded-pill py-2 fw-semibold shadow-sm mb-4">
+                <button type="submit" class="btn btn-primary w-100 rounded-pill py-2 fw-semibold shadow-sm">
                     Sign In
                 </button>
-
-                <p class="text-center small text-muted mb-0">
-                    Don't have an account? <a href="{{ route('register') }}" class="text-primary text-decoration-none fw-semibold">Create one</a>
-                </p>
             </form>
             
             <div class="mt-4 pt-4 border-top border-light border-opacity-50 text-start bg-light bg-opacity-50 p-3 rounded-3">
                 <p class="text-muted small fw-semibold mb-2"><i class="fas fa-info-circle me-1"></i> Demo Credentials</p>
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <span class="text-secondary small">Admin:</span>
-                    <span class="text-dark small font-monospace">admin@smartcbt.com / password123</span>
+                    <span class="text-dark small font-monospace">admin@gmail.com / 123456789</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="text-secondary small">User:</span>
-                    <span class="text-dark small font-monospace">user@smartcbt.com / password123</span>
+                    <span class="text-dark small font-monospace">user@gmail.com / 123456789</span>
                 </div>
             </div>
         </div>

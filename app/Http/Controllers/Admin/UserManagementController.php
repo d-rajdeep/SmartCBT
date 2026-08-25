@@ -27,11 +27,22 @@ class UserManagementController extends Controller
             ->latest()
             ->paginate(10);
 
+        $totalTimeSpent = $user->examAttempts()
+            ->where('status', 'completed')
+            ->get()
+            ->sum(function ($attempt) {
+                if (!$attempt->started_at || !$attempt->completed_at) {
+                    return 0;
+                }
+
+                return max(0, $attempt->completed_at->timestamp - $attempt->started_at->timestamp);
+            });
+
         $stats = [
             'total_exams' => $user->examAttempts()->count(),
             'average_score' => round($user->results()->avg('percentage') ?? 0, 1),
             'passed_exams' => $user->results()->where('is_passed', true)->count(),
-            'total_time' => $user->examAttempts()->sum('time_spent') ?? 0,
+            'total_time' => $totalTimeSpent,
         ];
 
         return view('admin.users.show', compact('user', 'results', 'stats'));

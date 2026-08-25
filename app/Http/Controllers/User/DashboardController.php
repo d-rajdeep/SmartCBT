@@ -21,15 +21,22 @@ class DashboardController extends Controller
 
         $averageScore = Result::where('user_id', $user->id)->avg('percentage') ?? 0;
 
-        $totalHoursSpent = ExamAttempt::where('user_id', $user->id)
+        $totalSecondsSpent = ExamAttempt::where('user_id', $user->id)
             ->where('status', 'completed')
             ->get()
             ->sum(function ($attempt) {
                 if ($attempt->started_at && $attempt->completed_at) {
-                    return $attempt->started_at->diffInHours($attempt->completed_at);
+                    return max(0, $attempt->completed_at->timestamp - $attempt->started_at->timestamp);
                 }
                 return 0;
             });
+
+        $totalMinutesSpent = intdiv($totalSecondsSpent, 60);
+        $spentHours = intdiv($totalMinutesSpent, 60);
+        $spentMinutes = $totalMinutesSpent % 60;
+        $totalTimeSpent = $spentHours > 0
+            ? $spentHours . 'h' . ($spentMinutes > 0 ? ' ' . $spentMinutes . 'm' : '')
+            : $spentMinutes . 'm';
 
         $globalRank = Result::where('percentage', '>', $averageScore)
             ->where('exam_id', '!=', null)
@@ -117,7 +124,7 @@ class DashboardController extends Controller
         return view('user.dashboard', compact(
             'totalExamsTaken',
             'averageScore',
-            'totalHoursSpent',
+            'totalTimeSpent',
             'globalRank',
             'availableExams',
             'chartLabels',

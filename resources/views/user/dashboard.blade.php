@@ -48,13 +48,13 @@
                 </div>
             </div>
             
-            <!-- Total Hours Spent -->
+            <!-- Total Time Spent -->
             <div class="col-xl-3 col-sm-6">
                 <div class="stats-card-premium bg-info p-4 h-100">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <h6 class="text-white text-opacity-75 mb-2 fw-medium">Hours Spent</h6>
-                            <h2 class="text-white mb-0 fw-bold">{{ $totalHoursSpent ?? 0 }}</h2>
+                            <h6 class="text-white text-opacity-75 mb-2 fw-medium">Time Spent</h6>
+                            <h2 class="text-white mb-0 fw-bold">{{ $totalTimeSpent ?? '0m' }}</h2>
                         </div>
                         <div class="icon-wrapper bg-white bg-opacity-25 rounded-circle p-3 text-white">
                             <i class="fas fa-clock fa-lg"></i>
@@ -252,7 +252,7 @@
                         borderColor: '#6366f1',
                         backgroundColor: gradient,
                         borderWidth: 3,
-                        pointBackgroundColor: '#ffffff',
+                        pointBackgroundColor: '#6366f1ff',
                         pointBorderColor: '#6366f1',
                         pointBorderWidth: 2,
                         pointRadius: 4,

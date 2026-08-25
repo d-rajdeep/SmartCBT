@@ -31,7 +31,7 @@
                     <tbody class="border-top-0">
                         @forelse($categories as $category)
                             <tr>
-                                <td class="ps-3 fw-medium text-dark">{{ $loop->index + 1 }}</td>
+                                <td class="ps-3 fw-medium text-dark">{{ $categories->firstItem() + $loop->index }}</td>
                                 <td class="fw-bold text-dark">
                                     <div class="d-flex align-items-center">
                                         <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3 text-primary">
@@ -88,7 +88,7 @@
             
             @if($categories->hasPages())
                 <div class="mt-4 d-flex justify-content-end">
-                    {{ $categories->links() }}
+                    {{ $categories->links('pagination::bootstrap-5') }}
                 </div>
             @endif
         </div>
